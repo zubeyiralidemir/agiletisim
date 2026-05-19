@@ -1,10 +1,5 @@
 'use strict';
 
-// =====================================================
-// MultiUserPaint — TCP Sunucu
-// NonBlocking, olay tabanlı (event-driven) mimari
-// Node.js net modülü ile yalın soket programlama
-// =====================================================
 
 const net = require('net');
 const { MessageType, ProtocolParser, encode } = require('../shared/protocol');
@@ -13,20 +8,19 @@ const FileManager = require('./fileManager');
 
 const PORT = process.env.PORT || 5000;
 const HOST = '0.0.0.0';
-const HEARTBEAT_INTERVAL = 15000; // 15 saniye
+const HEARTBEAT_INTERVAL = 15000;
 
 class PaintServer {
   constructor() {
     this.sessionManager = new SessionManager();
     this.fileManager = new FileManager();
 
-    // TCP Sunucu — Node.js net modülü doğası gereği NonBlocking'dir
-    // Her bağlantı event loop üzerinden asenkron işlenir
+
     this.server = net.createServer({ allowHalfOpen: false }, (socket) => {
       this._handleConnection(socket);
     });
 
-    // Heartbeat zamanlayıcısı
+
     this.heartbeatTimer = setInterval(() => this._sendHeartbeats(), HEARTBEAT_INTERVAL);
   }
 
@@ -50,56 +44,50 @@ class PaintServer {
       }
     });
 
-    // Graceful shutdown
+
     process.on('SIGINT', () => this._shutdown());
     process.on('SIGTERM', () => this._shutdown());
   }
 
-  /**
-   * Yeni TCP bağlantısı işleyicisi
-   * Her istemci için bağımsız bir ProtocolParser oluşturulur
-   */
+
   _handleConnection(socket) {
     const remoteAddr = `${socket.remoteAddress}:${socket.remotePort}`;
     console.log(`[Bağlantı] Yeni bağlantı: ${remoteAddr}`);
 
-    // Her soket için ayrı bir protokol ayrıştırıcı
+
     const parser = new ProtocolParser();
 
-    // Gelen mesaj işleyicisi
+
     parser.onMessage = (msg) => {
       this._handleMessage(socket, msg);
     };
 
-    // TCP veri alındığında parser'a ilet
+
     socket.on('data', (data) => {
       parser.feed(data);
     });
 
-    // Bağlantı kapandığında
+
     socket.on('close', () => {
       this._handleDisconnect(socket);
     });
 
-    // Bağlantı hatası
+
     socket.on('error', (err) => {
       console.error(`[Bağlantı] Soket hatası (${remoteAddr}):`, err.message);
     });
 
-    // TCP Keep-Alive
+
     socket.setKeepAlive(true, 10000);
     socket.setNoDelay(true);
   }
 
-  /**
-   * Gelen mesajı tipine göre yönlendir
-   */
   _handleMessage(socket, msg) {
     const { type } = msg;
 
     try {
       switch (type) {
-        // --- Bağlantı ---
+
         case MessageType.CONNECT:
           this._onConnect(socket, msg);
           break;
@@ -110,7 +98,7 @@ class PaintServer {
           this._send(socket, MessageType.HEARTBEAT, { timestamp: Date.now() });
           break;
 
-        // --- Dosya İşlemleri ---
+
         case MessageType.FILE_CREATE:
           this._onFileCreate(socket, msg);
           break;
@@ -130,7 +118,7 @@ class PaintServer {
           this._onFileDelete(socket, msg);
           break;
 
-        // --- Çizim ---
+
         case MessageType.DRAW_ACTION:
           this._onDrawAction(socket, msg);
           break;
@@ -138,7 +126,7 @@ class PaintServer {
           this._onCanvasClear(socket, msg);
           break;
 
-        // --- Pano ---
+
         case MessageType.CUT:
           this._onCut(socket, msg);
           break;
@@ -146,7 +134,7 @@ class PaintServer {
           this._onPaste(socket, msg);
           break;
 
-        // --- Katman ---
+
         case MessageType.LAYER_ADD:
           this._onLayerAdd(socket, msg);
           break;
@@ -177,29 +165,28 @@ class PaintServer {
     }
   }
 
-  // =============================================
-  // Bağlantı İşleyicileri
-  // =============================================
+
+
 
   _onConnect(socket, msg) {
     const { username } = msg;
     const result = this.sessionManager.registerUser(socket, username);
 
     if (result.success) {
-      // Bağlantı onayı
+
       this._send(socket, MessageType.CONNECT_ACK, {
         userId: result.userId,
         username: username,
         message: 'Bağlantı başarılı'
       });
 
-      // Diğer kullanıcılara bildir
+
       this._broadcast(MessageType.USER_JOIN, {
         userId: result.userId,
         username: username
       }, socket);
 
-      // Güncel kullanıcı listesini herkese gönder
+
       this._broadcastUserList();
     } else {
       this._send(socket, MessageType.CONNECT_REJECT, {
@@ -211,14 +198,14 @@ class PaintServer {
   _onDisconnect(socket) {
     const session = this.sessionManager.getSession(socket);
     if (session) {
-      // Açık dosyaları kapat
+
       for (const fileId of session.openFiles) {
         this.fileManager.closeFile(fileId, session.username);
       }
 
       this._send(socket, MessageType.DISCONNECT_ACK, {});
 
-      // Diğer kullanıcılara bildir
+
       this._broadcast(MessageType.USER_LEAVE, {
         userId: session.userId,
         username: session.username
@@ -235,12 +222,12 @@ class PaintServer {
     if (session) {
       console.log(`[Bağlantı] Bağlantı koptu: ${session.username}`);
 
-      // Açık dosyaları kapat
+
       for (const fileId of session.openFiles) {
         this.fileManager.closeFile(fileId, session.username);
       }
 
-      // Diğer kullanıcılara bildir
+
       this._broadcast(MessageType.USER_LEAVE, {
         userId: session.userId,
         username: session.username
@@ -251,9 +238,8 @@ class PaintServer {
     }
   }
 
-  // =============================================
-  // Dosya İşleyicileri
-  // =============================================
+
+
 
   _onFileCreate(socket, msg) {
     const session = this.sessionManager.getSession(socket);
@@ -269,7 +255,7 @@ class PaintServer {
 
     this._send(socket, MessageType.FILE_CREATE_ACK, { file: fileInfo });
 
-    // Tüm kullanıcılara yeni dosyayı bildir
+
     this._broadcast(MessageType.FILE_NOTIFY, {
       action: 'created',
       file: fileInfo,
@@ -293,7 +279,7 @@ class PaintServer {
       this.sessionManager.openFile(socket, fileId);
       this._send(socket, MessageType.FILE_OPEN_ACK, { file: fileData });
 
-      // Aynı dosyayı düzenleyen diğer kullanıcılara bildir
+
       this._broadcastToFile(fileId, MessageType.USER_JOIN, {
         username: session.username,
         fileId: fileId
@@ -313,7 +299,7 @@ class PaintServer {
 
     this._send(socket, MessageType.FILE_CLOSE_ACK, { fileId });
 
-    // Diğer editörlere bildir
+
     this._broadcastToFile(fileId, MessageType.USER_LEAVE, {
       username: session.username,
       fileId: fileId
@@ -328,7 +314,7 @@ class PaintServer {
     this.fileManager.setShared(fileId, shared !== false);
     this._send(socket, MessageType.FILE_SHARE_ACK, { fileId, shared });
 
-    // Tüm kullanıcılara bildir
+
     this._broadcast(MessageType.FILE_NOTIFY, {
       action: shared ? 'shared' : 'unshared',
       file: this.fileManager.getFileInfo(fileId),
@@ -353,9 +339,11 @@ class PaintServer {
     }
   }
 
-  // =============================================
-  // Çizim İşleyicileri
-  // =============================================
+
+
+
+
+
 
   _onDrawAction(socket, msg) {
     const session = this.sessionManager.getSession(socket);
@@ -363,7 +351,7 @@ class PaintServer {
 
     const { fileId, layerId, action } = msg;
 
-    // Aksiyonu dosyaya kaydet
+
     this.fileManager.addDrawAction(fileId, layerId, {
       ...action,
       userId: session.userId,
@@ -371,7 +359,7 @@ class PaintServer {
       timestamp: Date.now()
     });
 
-    // Aynı dosyayı düzenleyen diğer kullanıcılara ilet
+
     this._broadcastToFile(fileId, MessageType.DRAW_BROADCAST, {
       fileId,
       layerId,
@@ -396,9 +384,8 @@ class PaintServer {
     }, socket);
   }
 
-  // =============================================
-  // Pano İşleyicileri (Kes/Kopyala/Yapıştır)
-  // =============================================
+
+
 
   _onCut(socket, msg) {
     const session = this.sessionManager.getSession(socket);
@@ -406,7 +393,7 @@ class PaintServer {
 
     const { fileId, layerId, selection } = msg;
 
-    // Kes işlemini diğer editörlere bildir
+
     this._broadcastToFile(fileId, MessageType.CUT_BROADCAST, {
       fileId,
       layerId,
@@ -421,7 +408,7 @@ class PaintServer {
 
     const { fileId, layerId, pasteData, position } = msg;
 
-    // Yapıştırma verisini dosyaya ekle
+
     if (pasteData && pasteData.actions) {
       for (const action of pasteData.actions) {
         this.fileManager.addDrawAction(fileId, layerId, {
@@ -432,7 +419,7 @@ class PaintServer {
       }
     }
 
-    // Diğer editörlere bildir
+
     this._broadcastToFile(fileId, MessageType.PASTE_BROADCAST, {
       fileId,
       layerId,
@@ -442,9 +429,8 @@ class PaintServer {
     }, socket);
   }
 
-  // =============================================
-  // Katman İşleyicileri
-  // =============================================
+
+
 
   _onLayerAdd(socket, msg) {
     const session = this.sessionManager.getSession(socket);
@@ -514,13 +500,12 @@ class PaintServer {
     }, socket);
   }
 
-  // =============================================
-  // Yardımcı Metodlar
-  // =============================================
 
-  /**
-   * Tek bir istemciye mesaj gönder
-   */
+
+
+
+
+
   _send(socket, type, data = {}) {
     if (!socket.destroyed) {
       try {
@@ -575,17 +560,13 @@ class PaintServer {
     }
   }
 
-  /**
-   * Güncel kullanıcı listesini herkese gönder
-   */
+
   _broadcastUserList() {
     const users = this.sessionManager.getUserList();
     this._broadcast(MessageType.USER_LIST, { users });
   }
 
-  /**
-   * Heartbeat gönder — bağlantı canlılık kontrolü
-   */
+
   _sendHeartbeats() {
     const frame = encode(MessageType.HEARTBEAT, { timestamp: Date.now() });
     for (const socket of this.sessionManager.getAllSockets()) {
@@ -597,9 +578,7 @@ class PaintServer {
     }
   }
 
-  /**
-   * Sunucu kapatma
-   */
+
   _shutdown() {
     console.log('\n[Sunucu] Kapatılıyor...');
     clearInterval(this.heartbeatTimer);
@@ -611,6 +590,5 @@ class PaintServer {
   }
 }
 
-// Sunucuyu başlat
 const server = new PaintServer();
 server.start();

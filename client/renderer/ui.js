@@ -4,7 +4,6 @@
 
 // --- UI Başlatma ---
 function initUI() {
-  // Araçlar
   document.querySelectorAll('.tool-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
@@ -13,7 +12,7 @@ function initUI() {
     });
   });
 
-  // Renk Seçici
+
   const colorPicker = document.getElementById('color-picker');
   const colorPreview = document.getElementById('color-preview');
   colorPicker.addEventListener('input', (e) => {
@@ -30,7 +29,7 @@ function initUI() {
     });
   });
 
-  // Fırça Boyutu
+
   const brushSize = document.getElementById('brush-size');
   const brushSizeLabel = document.getElementById('brush-size-label');
   brushSize.addEventListener('input', (e) => {
@@ -38,7 +37,7 @@ function initUI() {
     brushSizeLabel.textContent = e.target.value;
   });
 
-  // Fırça Opaklığı
+
   const brushOpacity = document.getElementById('brush-opacity');
   const brushOpacityLabel = document.getElementById('brush-opacity-label');
   brushOpacity.addEventListener('input', (e) => {
@@ -46,7 +45,7 @@ function initUI() {
     brushOpacityLabel.textContent = e.target.value;
   });
 
-  // Zoom
+
   document.getElementById('btn-zoom-in').addEventListener('click', () => {
     AppState.zoom = Math.min(AppState.zoom + 0.1, 3);
     applyZoom();
@@ -60,7 +59,7 @@ function initUI() {
     applyZoom();
   });
 
-  // Katman Temizle
+
   document.getElementById('btn-clear-layer').addEventListener('click', () => {
     if (!AppState.currentFileId || !AppState.activeLayerId) return;
     if (confirm('Aktif katmanı temizlemek istediğinize emin misiniz?')) {
@@ -69,7 +68,7 @@ function initUI() {
     }
   });
 
-  // Pano: Kes
+
   document.getElementById('btn-cut').addEventListener('click', () => {
     if (!AppState.currentFileId || !AppState.activeLayerId) return;
     if (!CanvasEngine.selectionRect) {
@@ -90,7 +89,7 @@ function initUI() {
     window.api.cut(AppState.currentFileId, AppState.activeLayerId, { x, y, w, h });
   });
 
-  // Pano: Kopyala
+
   document.getElementById('btn-copy').addEventListener('click', () => {
     if (!AppState.currentFileId || !AppState.activeLayerId) return;
     if (!CanvasEngine.selectionRect) {
@@ -107,7 +106,7 @@ function initUI() {
     CanvasEngine.selectionRect = null;
   });
 
-  // Pano: Yapıştır
+
   document.getElementById('btn-paste').addEventListener('click', () => {
     if (!AppState.currentFileId || !AppState.activeLayerId) return;
     if (!AppState.clipboard) {
@@ -122,13 +121,9 @@ function initUI() {
     const { w, h, data } = AppState.clipboard;
     const imgData = new ImageData(new Uint8ClampedArray(data), w, h);
     ctx.putImageData(imgData, px, py);
-    
-    // Normalde aksiyon bazlı clipboard daha iyi olurdu, basit image tabanlı yapıştırma
-    // Ağ üzerinden göndermek için imageData'yı eyleme dönüştürmek karmaşık, 
-    // proje kapsamında basit bırakıyoruz veya action base'li yolluyoruz (TODO)
   });
 
-  // Katman Ekle
+
   document.getElementById('btn-add-layer').addEventListener('click', () => {
     if (!AppState.currentFileId) return;
     const name = prompt('Katman adı:', `Katman ${AppState.currentFile.layers.length + 1}`);
@@ -137,7 +132,7 @@ function initUI() {
     }
   });
 
-  // Modal İşlemleri
+
   document.getElementById('btn-new-file').addEventListener('click', () => {
     document.getElementById('modal-new-file').style.display = 'flex';
   });
@@ -152,12 +147,12 @@ function initUI() {
     document.getElementById('modal-new-file').style.display = 'none';
   });
 
-  // Yenile ve Çıkış
+
   document.getElementById('btn-refresh-files').addEventListener('click', refreshFileList);
   document.getElementById('btn-disconnect').addEventListener('click', disconnectFromServer);
 }
 
-// --- Render Metodları ---
+
 
 function renderFileList() {
   const ul = document.getElementById('file-list');

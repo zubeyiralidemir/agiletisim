@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MultiUserPaint — Çok Kullanıcılı Resim Düzenleyici</title>
+  <meta name="description" content="TCP tabanlı çok kullanıcılı eş zamanlı resim düzenleme masaüstü uygulaması">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- ============================================= -->
+  <!-- GİRİŞ EKRANI (Login Screen) -->
+  <!-- ============================================= -->
+  <div id="login-screen" class="screen active">
+    <div class="login-container">
+      <div class="login-logo">
+        <div class="logo-icon">
+          <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+            <defs>
+              <linearGradient id="logoGrad" x1="0" y1="0" x2="64" y2="64">
+                <stop offset="0%" stop-color="#6366f1"/>
+                <stop offset="100%" stop-color="#ec4899"/>
+              </linearGradient>
+            </defs>
+            <rect x="4" y="4" width="56" height="56" rx="14" fill="url(#logoGrad)" opacity="0.15"/>
+            <path d="M20 44 L20 20 L28 20 C32 20 35 23 35 27 C35 31 32 34 28 34 L24 34 L24 44 Z" fill="url(#logoGrad)"/>
+            <circle cx="40" cy="28" r="6" fill="url(#logoGrad)" opacity="0.7"/>
+            <rect x="37" y="36" width="6" height="10" rx="2" fill="url(#logoGrad)" opacity="0.5"/>
+          </svg>
+        </div>
+        <h1 class="login-title">MultiUserPaint</h1>
+        <p class="login-subtitle">Çok Kullanıcılı Resim Düzenleyici</p>
+      </div>
+
+      <div class="login-form">
+        <div class="form-group">
+          <label for="input-host">Sunucu Adresi</label>
+          <input type="text" id="input-host" value="localhost" placeholder="ör: 192.168.1.10">
+        </div>
+        <div class="form-group">
+          <label for="input-port">Port</label>
+          <input type="number" id="input-port" value="5000" placeholder="5000">
+        </div>
+        <div class="form-group">
+          <label for="input-username">Kullanıcı Adı</label>
+          <input type="text" id="input-username" placeholder="Kullanıcı adınızı girin" maxlength="30" autofocus>
+        </div>
+        <button id="btn-connect" class="btn btn-primary btn-lg">
+          <span class="btn-text">Bağlan</span>
+          <span class="btn-loader" style="display:none;">Bağlanıyor...</span>
+        </button>
+        <p id="login-error" class="error-text" style="display:none;"></p>
+      </div>
+
+      <div class="login-footer">
+        <p>TCP Soket Protokolü • Node.js • Electron</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================= -->
+  <!-- ANA UYGULAMA (Main Application) -->
+  <!-- ============================================= -->
+  <div id="app-screen" class="screen">
+
+    <!-- Üst Bar (Top Bar) -->
+    <header id="top-bar">
+      <div class="top-bar-left">
+        <div class="app-logo-small">
+          <svg width="24" height="24" viewBox="0 0 64 64" fill="none">
+            <defs><linearGradient id="logoGradS" x1="0" y1="0" x2="64" y2="64"><stop offset="0%" stop-color="#6366f1"/><stop offset="100%" stop-color="#ec4899"/></linearGradient></defs>
+            <rect x="4" y="4" width="56" height="56" rx="14" fill="url(#logoGradS)" opacity="0.3"/>
+            <path d="M20 44 L20 20 L28 20 C32 20 35 23 35 27 C35 31 32 34 28 34 L24 34 L24 44 Z" fill="url(#logoGradS)"/>
+          </svg>
+          <span>MultiUserPaint</span>
+        </div>
+        <div class="top-bar-divider"></div>
+        <span id="current-file-name" class="file-name-display">Dosya seçilmedi</span>
+      </div>
+
+      <div class="top-bar-center">
+        <!-- Çizim araç çubuğu buraya taşınacak -->
+      </div>
+
+      <div class="top-bar-right">
+        <div id="connection-status" class="status-badge connected">
+          <span class="status-dot"></span>
+          <span id="status-text">Bağlı</span>
+        </div>
+        <span id="username-display" class="username-badge"></span>
+        <button id="btn-disconnect" class="btn btn-ghost btn-sm" title="Bağlantıyı Kes">
+          ✕
+        </button>
+      </div>
+    </header>
+
+    <!-- Ana İçerik -->
+    <div id="main-content">
+
+      <!-- Sol Panel: Dosyalar + Araçlar -->
+      <aside id="left-panel">
+        <!-- Dosya Gezgini -->
+        <div class="panel-section" id="file-explorer-section">
+          <div class="panel-header">
+            <h3>📁 Dosyalar</h3>
+            <button id="btn-refresh-files" class="btn btn-icon" title="Yenile">↻</button>
+          </div>
+          <div class="panel-actions">
+            <button id="btn-new-file" class="btn btn-sm btn-primary" style="width:100%;">+ Yeni Dosya</button>
+          </div>
+          <ul id="file-list" class="file-list">
+            <li class="empty-state">Henüz dosya yok</li>
+          </ul>
+        </div>
+
+        <!-- Çizim Araçları -->
+        <div class="panel-section" id="tools-section">
+          <div class="panel-header">
+            <h3>🖌️ Araçlar</h3>
+          </div>
+          <div class="tools-grid">
+            <button class="tool-btn active" data-tool="pen" title="Kalem">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+            </button>
+            <button class="tool-btn" data-tool="brush" title="Fırça">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.37 2.63a2.12 2.12 0 0 1 3 3L14 13l-4 1 1-4Z"/><path d="M9 14.5A3.5 3.5 0 0 0 5.5 18c-1.2 0-2.5.8-2.5 2.5 3 0 5.5-1.5 6-4.5Z"/></svg>
+            </button>
+            <button class="tool-btn" data-tool="eraser" title="Silgi">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.9-9.9c1-1 2.5-1 3.4 0l5.3 5.3c1 1 1 2.5 0 3.4L12 21"/><path d="M22 21H7"/></svg>
+            </button>
+            <button class="tool-btn" data-tool="line" title="Çizgi">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="19" x2="19" y2="5"/></svg>
+            </button>
+            <button class="tool-btn" data-tool="rect" title="Dikdörtgen">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+            </button>
+            <button class="tool-btn" data-tool="circle" title="Daire">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>
+            </button>
+            <button class="tool-btn" data-tool="select" title="Seçim (Kes/Kopyala/Yapıştır)">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3h4M15 3h4M3 5v4M21 5v4M3 15v4M21 15v4M5 21h4M15 21h4"/></svg>
+            </button>
+            <button class="tool-btn" data-tool="fill" title="Doldur">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m19 11-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2a2 2 0 0 0 2.8 0L19 11Z"/><path d="m5 2 5 5"/><path d="M2 13h15"/><path d="M22 20a2 2 0 1 1-4 0c0-1.6 2-3 2-3s2 1.4 2 3Z"/></svg>
+            </button>
+          </div>
+
+          <!-- Renk ve Boyut -->
+          <div class="tool-options">
+            <div class="option-group">
+              <label>Renk</label>
+              <div class="color-picker-wrap">
+                <input type="color" id="color-picker" value="#000000">
+                <span id="color-preview" class="color-preview" style="background:#000000;"></span>
+              </div>
+              <div class="color-presets">
+                <button class="color-preset" data-color="#000000" style="background:#000000;" title="Siyah"></button>
+                <button class="color-preset" data-color="#ffffff" style="background:#ffffff;" title="Beyaz"></button>
+                <button class="color-preset" data-color="#ef4444" style="background:#ef4444;" title="Kırmızı"></button>
+                <button class="color-preset" data-color="#f97316" style="background:#f97316;" title="Turuncu"></button>
+                <button class="color-preset" data-color="#eab308" style="background:#eab308;" title="Sarı"></button>
+                <button class="color-preset" data-color="#22c55e" style="background:#22c55e;" title="Yeşil"></button>
+                <button class="color-preset" data-color="#3b82f6" style="background:#3b82f6;" title="Mavi"></button>
+                <button class="color-preset" data-color="#8b5cf6" style="background:#8b5cf6;" title="Mor"></button>
+                <button class="color-preset" data-color="#ec4899" style="background:#ec4899;" title="Pembe"></button>
+                <button class="color-preset" data-color="#6b7280" style="background:#6b7280;" title="Gri"></button>
+              </div>
+            </div>
+            <div class="option-group">
+              <label>Boyut: <span id="brush-size-label">3</span>px</label>
+              <input type="range" id="brush-size" min="1" max="50" value="3">
+            </div>
+            <div class="option-group">
+              <label>Opaklık: <span id="brush-opacity-label">100</span>%</label>
+              <input type="range" id="brush-opacity" min="1" max="100" value="100">
+            </div>
+          </div>
+
+          <!-- Pano İşlemleri -->
+          <div class="panel-header" style="margin-top:8px;">
+            <h3>📋 Pano</h3>
+          </div>
+          <div class="clipboard-actions">
+            <button id="btn-cut" class="btn btn-sm btn-ghost" title="Kes (Ctrl+X)">✂️ Kes</button>
+            <button id="btn-copy" class="btn btn-sm btn-ghost" title="Kopyala (Ctrl+C)">📋 Kopyala</button>
+            <button id="btn-paste" class="btn btn-sm btn-ghost" title="Yapıştır (Ctrl+V)">📌 Yapıştır</button>
+          </div>
+
+          <!-- Tuval İşlemleri -->
+          <div class="canvas-actions">
+            <button id="btn-clear-layer" class="btn btn-sm btn-danger" title="Aktif Katmanı Temizle">🗑️ Katmanı Temizle</button>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Orta: Tuval -->
+      <main id="canvas-area">
+        <div id="canvas-container">
+          <div id="canvas-wrapper">
+            <!-- Katman canvas'ları buraya dinamik eklenir -->
+          </div>
+          <div id="selection-overlay" style="display:none;"></div>
+        </div>
+        <div id="canvas-placeholder" class="canvas-placeholder">
+          <div class="placeholder-content">
+            <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <circle cx="8.5" cy="8.5" r="1.5"/>
+              <path d="m21 15-5-5L5 21"/>
+            </svg>
+            <p>Çizim yapmak için sol panelden bir dosya açın<br>veya yeni bir dosya oluşturun</p>
+          </div>
+        </div>
+
+        <!-- Zoom Kontrolü -->
+        <div id="zoom-controls">
+          <button id="btn-zoom-out" class="btn btn-icon" title="Küçült">−</button>
+          <span id="zoom-level">100%</span>
+          <button id="btn-zoom-in" class="btn btn-icon" title="Büyült">+</button>
+          <button id="btn-zoom-reset" class="btn btn-icon" title="Sıfırla">⟳</button>
+        </div>
+      </main>
+
+      <!-- Sağ Panel: Katmanlar + Kullanıcılar -->
+      <aside id="right-panel">
+        <!-- Katman Yönetimi -->
+        <div class="panel-section" id="layers-section">
+          <div class="panel-header">
+            <h3>◫ Katmanlar</h3>
+            <button id="btn-add-layer" class="btn btn-icon" title="Katman Ekle">+</button>
+          </div>
+          <ul id="layer-list" class="layer-list">
+            <li class="empty-state">Dosya açılmadı</li>
+          </ul>
+        </div>
+
+        <!-- Çevrimiçi Kullanıcılar -->
+        <div class="panel-section" id="users-section">
+          <div class="panel-header">
+            <h3>👥 Kullanıcılar</h3>
+            <span id="user-count" class="badge">0</span>
+          </div>
+          <ul id="user-list" class="user-list">
+            <li class="empty-state">Kimse bağlı değil</li>
+          </ul>
+        </div>
+      </aside>
+    </div>
+
+    <!-- Alt Bar -->
+    <footer id="bottom-bar">
+      <span id="coord-display">X: 0 Y: 0</span>
+      <span id="canvas-size-display">-</span>
+      <span id="active-layer-display">-</span>
+      <span id="auto-save-status">💾 Otomatik kaydetme aktif</span>
+    </footer>
+  </div>
+
+  <!-- ============================================= -->
+  <!-- YENİ DOSYA MODAL -->
+  <!-- ============================================= -->
+  <div id="modal-new-file" class="modal" style="display:none;">
+    <div class="modal-overlay"></div>
+    <div class="modal-content">
+      <h2>Yeni Dosya Oluştur</h2>
+      <div class="form-group">
+        <label for="new-file-name">Dosya Adı</label>
+        <input type="text" id="new-file-name" placeholder="Yeni çizimim" maxlength="50">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="new-file-width">Genişlik (px)</label>
+          <input type="number" id="new-file-width" value="1200" min="100" max="4000">
+        </div>
+        <div class="form-group">
+          <label for="new-file-height">Yükseklik (px)</label>
+          <input type="number" id="new-file-height" value="800" min="100" max="4000">
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button id="btn-modal-cancel" class="btn btn-ghost">İptal</button>
+        <button id="btn-modal-create" class="btn btn-primary">Oluştur</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="connection.js"></script>
+  <script src="canvas.js"></script>
+  <script src="ui.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

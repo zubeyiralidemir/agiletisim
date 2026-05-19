@@ -1,0 +1,26 @@
+# Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Electron
+dist/
+out/
+dist-zip/
+
+# Proje Özel
+server/storage/
+
+# İşletim Sistemi
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editör & IDE
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

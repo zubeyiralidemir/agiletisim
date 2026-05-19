@@ -1,0 +1,15 @@
+{
+  "name": "multiuserpaint-client",
+  "version": "1.0.0",
+  "description": "MultiUserPaint Electron İstemci - Çok kullanıcılı resim düzenleyici masaüstü uygulaması",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev"
+  },
+  "keywords": ["electron", "tcp", "paint", "canvas", "multiuser"],
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^35.0.0"
+  }
+}
